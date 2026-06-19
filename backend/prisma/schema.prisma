@@ -1,0 +1,289 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  INTERNAL
+  CUSTOMER
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  BLOCKED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductionJobStatus {
+  PLANNED
+  IN_PRODUCTION
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                       String             @id @default(cuid())
+  email                    String             @unique
+  passwordHash             String
+  displayName              String
+  role                     Role
+  customerId               String?
+  customer                 Customer?          @relation("CustomerUsers", fields: [customerId], references: [id])
+  managedProjects          Project[]          @relation("ProjectManager")
+  assignedTasks            Task[]             @relation("TaskAssignee")
+  comments                 Comment[]
+  createdFileVersions      FileVersion[]      @relation("FileVersionAuthor")
+  uploadedAssets           FileAsset[]        @relation("FileAssetUploader")
+  requestedApprovals       Approval[]         @relation("ApprovalRequester")
+  decidedApprovals         Approval[]         @relation("ApprovalDecider")
+  createdProductionJobs    ProductionJob[]    @relation("ProductionJobCreator")
+  createdWorkflowTemplates WorkflowTemplate[] @relation("WorkflowTemplateCreator")
+  auditLogs                AuditLog[]
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  @@index([customerId])
+  @@index([role])
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  users     User[]    @relation("CustomerUsers")
+  projects  Project[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ProjectType {
+  id                String             @id @default(cuid())
+  name              String             @unique
+  description       String?
+  projects          Project[]
+  workflowTemplates WorkflowTemplate[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model WorkflowTemplate {
+  id            String                 @id @default(cuid())
+  name          String
+  description   String?
+  projectTypeId String?
+  projectType   ProjectType?           @relation(fields: [projectTypeId], references: [id])
+  createdById   String?
+  createdBy     User?                  @relation("WorkflowTemplateCreator", fields: [createdById], references: [id])
+  taskTemplates WorkflowTaskTemplate[]
+  projects      Project[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([projectTypeId])
+}
+
+model WorkflowTaskTemplate {
+  id                 String            @id @default(cuid())
+  workflowTemplateId String
+  workflowTemplate   WorkflowTemplate  @relation(fields: [workflowTemplateId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  sortOrder          Int
+  defaultRole        Role?
+  tasks              Task[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([workflowTemplateId, sortOrder])
+}
+
+model Project {
+  id                 String            @id @default(cuid())
+  name               String
+  code               String            @unique
+  description        String?
+  status             ProjectStatus     @default(DRAFT)
+  customerId         String
+  customer           Customer          @relation(fields: [customerId], references: [id])
+  projectTypeId      String
+  projectType        ProjectType       @relation(fields: [projectTypeId], references: [id])
+  managerId          String?
+  manager            User?             @relation("ProjectManager", fields: [managerId], references: [id])
+  workflowTemplateId String?
+  workflowTemplate   WorkflowTemplate? @relation(fields: [workflowTemplateId], references: [id])
+  briefings          Briefing[]
+  tasks              Task[]
+  fileAssets         FileAsset[]
+  comments           Comment[]
+  approvals          Approval[]
+  productionJobs     ProductionJob[]
+  auditLogs          AuditLog[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([customerId])
+  @@index([projectTypeId])
+  @@index([managerId])
+}
+
+model Briefing {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model Task {
+  id          String                @id @default(cuid())
+  projectId   String
+  project     Project               @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  templateId  String?
+  template    WorkflowTaskTemplate? @relation(fields: [templateId], references: [id])
+  title       String
+  description String?
+  status      TaskStatus            @default(TODO)
+  assigneeId  String?
+  assignee    User?                 @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  comments    Comment[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([projectId])
+  @@index([assigneeId])
+}
+
+model FileAsset {
+  id           String        @id @default(cuid())
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?         @relation("FileAssetUploader", fields: [uploadedById], references: [id])
+  filename     String
+  mimeType     String
+  storagePath  String
+  versions     FileVersion[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([projectId])
+}
+
+model FileVersion {
+  id            String      @id @default(cuid())
+  fileAssetId   String
+  fileAsset     FileAsset   @relation(fields: [fileAssetId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  checksum      String?
+  createdById   String?
+  createdBy     User?       @relation("FileVersionAuthor", fields: [createdById], references: [id])
+  approvals     Approval[]
+  comments      Comment[]
+  createdAt     DateTime    @default(now())
+
+  @@unique([fileAssetId, versionNumber])
+  @@index([createdById])
+}
+
+model Comment {
+  id            String       @id @default(cuid())
+  content       String
+  isInternal    Boolean      @default(false)
+  projectId     String?
+  project       Project?     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId        String?
+  task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  fileVersionId String?
+  fileVersion   FileVersion? @relation(fields: [fileVersionId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User         @relation(fields: [authorId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([projectId])
+  @@index([taskId])
+  @@index([fileVersionId])
+  @@index([authorId])
+}
+
+model Approval {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileVersionId String
+  fileVersion   FileVersion    @relation(fields: [fileVersionId], references: [id], onDelete: Cascade)
+  requestedById String?
+  requestedBy   User?          @relation("ApprovalRequester", fields: [requestedById], references: [id])
+  decidedById   String?
+  decidedBy     User?          @relation("ApprovalDecider", fields: [decidedById], references: [id])
+  status        ApprovalStatus @default(PENDING)
+  decisionNote  String?
+  decidedAt     DateTime?
+  createdAt     DateTime       @default(now())
+
+  @@index([projectId])
+  @@index([fileVersionId])
+}
+
+model ProductionJob {
+  id          String              @id @default(cuid())
+  projectId   String
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?               @relation("ProductionJobCreator", fields: [createdById], references: [id])
+  title       String
+  details     String?
+  dueDate     DateTime?
+  status      ProductionJobStatus @default(PLANNED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([projectId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  projectId  String?
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  entityType String
+  entityId   String
+  action     String
+  details    String?
+  createdAt  DateTime @default(now())
+
+  @@index([projectId])
+  @@index([actorId])
+  @@index([entityType, entityId])
+}
