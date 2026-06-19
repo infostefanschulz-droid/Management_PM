@@ -1,20 +1,33 @@
-# Management_PM
+# Media Project Manager
 
-Windows-kompatibles Grundgerüst für eine modulare Projektmanagement-Software im Medienbereich.
+Windows-kompatibles Monorepo für eine modulare Projektmanagement-Software im Medienbereich.
 
 ## Enthaltenes Grundlagenmodul
 
 - React + TypeScript + Vite + Tailwind CSS im Frontend
 - Fastify + TypeScript im Backend
 - Prisma mit SQLite
-- statische Auslieferung des gebauten Frontends durch das Backend
+- Statische Auslieferung des gebauten Frontends durch das Backend
 - Windows-orientierte Verzeichnis- und Service-Konfiguration
 
 ## Projektstruktur
 
-- `/frontend` – React-Oberfläche für Systemstatus und Betriebsparameter
-- `/backend` – Fastify-API, Prisma-Schema und statische Auslieferung
-- `/scripts` – PowerShell-Skripte für Windows-Deployment
+```
+media-project-manager/
+├─ apps/
+│  ├─ backend/        – Fastify-API, Prisma-Schema und statische Auslieferung
+│  └─ frontend/       – React-Oberfläche für Systemstatus und Betriebsparameter
+├─ packages/
+│  └─ shared/         – Gemeinsame Typen und Hilfsfunktionen
+├─ docs/              – Projektdokumentation
+├─ scripts/           – PowerShell-Skripte für Windows-Deployment
+├─ data/              – SQLite-Datenbankdateien (lokal)
+├─ storage/           – Upload-Verzeichnis (lokal)
+├─ logs/              – Protokolldateien (lokal)
+├─ .env.example       – Vorlage für Umgebungsvariablen
+├─ README.md
+└─ CHANGELOG.md
+```
 
 ## Wichtige Windows-Pfade
 
@@ -34,63 +47,83 @@ Die Anwendung erwartet lokale Pfade. UNC-/Netzwerkpfade für die SQLite-Datei we
 - npm 10+
 - Windows Server 2019 für den Zielbetrieb
 
-## Einrichtung
+## Windows-Startanleitung
+
+### 1. Verzeichnisse vorbereiten
 
 ```powershell
-cd D:\MediaPM
-copy .\backend\.env.example .\backend\.env
-npm install
-npm --prefix .\backend install
-npm --prefix .\frontend install
+powershell -ExecutionPolicy Bypass -File .\scripts\Prepare-Environment.ps1
 ```
 
-Für lokale Entwicklung im Repository kann `backend/.env` bei `DATABASE_URL="file:./dev.db"` bleiben. Für Windows-Deployment `DATABASE_URL` auf `file:/D:/MediaPM/data/app.sqlite` setzen.
+### 2. Abhängigkeiten installieren
 
-## Wichtige Skripte
+```powershell
+npm install
+npm --prefix .\apps\backend install
+npm --prefix .\apps\frontend install
+```
 
-Root:
+### 3. Umgebungsvariablen einrichten
+
+```powershell
+copy .env.example .env
+copy .\apps\backend\.env.example .\apps\backend\.env
+```
+
+Für lokale Entwicklung kann `apps/backend/.env` bei `DATABASE_URL="file:./dev.db"` bleiben.
+Für Windows-Deployment `DATABASE_URL` auf `file:/D:/MediaPM/data/app.sqlite` setzen.
+
+### 4. Frontend und Backend bauen
 
 ```powershell
 npm run build
-npm run lint
-npm run dev:backend
-npm run dev:frontend
-npm run start
 ```
 
-Backend:
+### 5. Prisma-Migrationen anwenden
 
 ```powershell
-npm --prefix .\backend run prisma:migrate
-npm --prefix .\backend run prisma:migrate:dev
-npm --prefix .\backend run prisma:generate
+npm --prefix .\apps\backend run prisma:migrate
 ```
 
-## Start unter Windows
+### 6. Service installieren
 
-1. Verzeichnisse vorbereiten:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\Install-WindowsService.ps1
+```
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\Prepare-Environment.ps1
-   ```
+## Lokale Entwicklung
 
-2. Frontend und Backend bauen:
+Frontend und Backend gleichzeitig starten:
 
-   ```powershell
-   npm run build
-   ```
+```powershell
+npm run dev
+```
 
-3. Prisma-Migrationen anwenden:
+Oder einzeln:
 
-   ```powershell
-   npm --prefix .\backend run prisma:migrate
-   ```
+```powershell
+npm run dev:backend
+npm run dev:frontend
+```
 
-4. Service installieren:
+## Wichtige npm-Skripte (Root)
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\scripts\Install-WindowsService.ps1
-   ```
+| Skript | Beschreibung |
+|--------|-------------|
+| `npm run dev` | Startet Frontend und Backend parallel |
+| `npm run dev:backend` | Startet nur das Backend |
+| `npm run dev:frontend` | Startet nur das Frontend |
+| `npm run build` | Baut Frontend und Backend |
+| `npm run start` | Startet das gebaute Backend (Produktion) |
+| `npm run lint` | Lint des Frontends |
+
+## Backend-spezifische Skripte
+
+```powershell
+npm --prefix .\apps\backend run prisma:migrate
+npm --prefix .\apps\backend run prisma:migrate:dev
+npm --prefix .\apps\backend run prisma:generate
+```
 
 ## API-Startpunkte
 
@@ -119,14 +152,14 @@ Das SQLite-Schema enthält die Kernobjekte:
 Sicherheitsrelevante Modellierung:
 
 - Kundenbenutzer können per `customerId` an eigene Mandanten gebunden werden
-- interne Kommentare sind über `Comment.isInternal` markiert
+- Interne Kommentare sind über `Comment.isInternal` markiert
 - Freigaben referenzieren immer `fileVersionId`
 - Datei-Versionen bleiben über `FileAsset` + `FileVersion.versionNumber` nachvollziehbar
 - Audit-Ereignisse werden in `AuditLog` abgebildet
 
 ## Frontend-/Backend-Kopplung
 
-- Das Backend liefert `frontend/dist` statisch aus, sobald ein Frontend-Build vorhanden ist.
+- Das Backend liefert `apps/frontend/dist` statisch aus, sobald ein Frontend-Build vorhanden ist.
 - Im Vite-Dev-Server werden `/api`-Aufrufe nach `http://127.0.0.1:3000` weitergeleitet.
 
 ## Hinweise
@@ -134,3 +167,4 @@ Sicherheitsrelevante Modellierung:
 - Keine Docker-Dateien
 - Keine PostgreSQL- oder Redis-Abhängigkeiten
 - Uploads gehören ins lokale Dateisystem; in der Datenbank werden nur Metadaten gespeichert
+
