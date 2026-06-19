@@ -4,11 +4,12 @@
   "description": "Windows-friendly media project management foundation",
   "private": true,
   "scripts": {
-    "build": "npm --prefix backend run prisma:generate && npm --prefix frontend run build && npm --prefix backend run build",
-    "dev:backend": "npm --prefix backend run dev",
-    "dev:frontend": "npm --prefix frontend run dev",
-    "lint": "npm --prefix frontend run lint",
-    "start": "npm --prefix backend run start"
+    "dev": "npm run dev:backend & npm run dev:frontend",
+    "dev:backend": "npm --prefix apps/backend run dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "build": "npm --prefix apps/backend run prisma:generate && npm --prefix apps/frontend run build && npm --prefix apps/backend run build",
+    "start": "npm --prefix apps/backend run start",
+    "lint": "npm --prefix apps/frontend run lint"
   },
   "repository": {
     "type": "git",
