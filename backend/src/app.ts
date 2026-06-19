@@ -43,7 +43,7 @@ export async function buildApp() {
     let database: "ok" | "error" = "ok";
 
     try {
-      await prisma.$queryRawUnsafe("SELECT 1");
+      await prisma.$queryRaw`SELECT 1`;
     } catch {
       database = "error";
     }
@@ -72,7 +72,7 @@ export async function buildApp() {
     backupDir: config.backupDir,
     databaseFilePath: config.databaseFilePath,
     frontendDistDir: config.frontendDistDir,
-    servesFrontend: true,
+    servesFrontend: frontendAvailable,
     targetPlatform: "windows-server-2019",
     databaseEngine: "sqlite",
   }));

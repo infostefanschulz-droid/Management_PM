@@ -62,6 +62,7 @@ Backend:
 
 ```powershell
 npm --prefix .\backend run prisma:migrate
+npm --prefix .\backend run prisma:migrate:dev
 npm --prefix .\backend run prisma:generate
 ```
 

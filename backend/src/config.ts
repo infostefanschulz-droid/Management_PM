@@ -66,9 +66,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const frontendDistDir = resolve(backendRoot, "../frontend/dist");
   const frontendIndexPath = resolve(frontendDistDir, "index.html");
   const port = Number(env.PORT ?? "3000");
+  const jwtSecret = env.JWT_SECRET?.trim();
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("PORT muss eine gültige TCP-Portnummer sein.");
+  }
+
+  if (env.NODE_ENV === "production" && !jwtSecret) {
+    throw new Error("JWT_SECRET muss in Produktion gesetzt sein.");
   }
 
   return {
@@ -83,9 +88,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     frontendIndexPath,
     host: env.HOST ?? "0.0.0.0",
     port,
-    jwtSecret:
-      env.JWT_SECRET && env.JWT_SECRET.trim().length > 0
-        ? env.JWT_SECRET
-        : "development-only-secret",
+    jwtSecret: jwtSecret || "development-only-secret",
   };
 }
